@@ -3,45 +3,49 @@ import numpy as np
 
 
 ######### ekf constants #########
-imu_hz = 20
-ranging_hz = 10
+imu_hz = 10
+ranging_hz = 0
 
-NUM_STATES = 9
+NUM_STATES = 6
 NUM_RANGING_MEASUREMENTS = 3
-process_noise_variance = 0.001
-measurement_noise_variance = 0.001
-x_0_guess_variance = 2
+process_noise_variance = 0.01
+measurement_noise_variance = 0.01
+x_0_guess_variance = 0.01
 Q = np.eye(NUM_STATES) * process_noise_variance * (1/imu_hz)
 R = np.eye(NUM_RANGING_MEASUREMENTS) * measurement_noise_variance
 
-A = np.array([[ 1, 0, 0, (1/imu_hz), 0, 0, (1/imu_hz)**2, 0, 0 ],
-              [ 0, 1, 0,          0, (1/imu_hz), 0, 0, (1/imu_hz)**2, 0 ],
-              [ 0, 0, 1,          0,          0, (1/imu_hz), 0, 0, (1/imu_hz)**2 ],
-              [ 0, 0, 0,          1,          0,          0, (1/imu_hz), 0, 0 ],
-              [ 0, 0, 0,          0,          1,          0, 0, (1/imu_hz), 0 ],
-              [ 0, 0, 0,          0,          0,          1, 0, 0, (1/imu_hz) ],
-              [ 0, 0, 0,          0,          0,          0, 1, 0, 0 ],
-              [ 0, 0, 0,          0,          0,          0, 0, 1, 0 ],
-              [ 0, 0, 0,          0,          0,          0, 0, 0, 1 ]])
+A = np.array([[ 1, 0, 0, (1/imu_hz), 0, 0 ],
+              [ 0, 1, 0, 0, (1/imu_hz), 0 ],
+              [ 0, 0, 1, 0, 0, (1/imu_hz) ],
+              [ 0, 0, 0, 1, 0, 0 ],
+              [ 0, 0, 0, 0, 1, 0 ],
+              [ 0, 0, 0, 0, 0, 1 ],])
+
+B = np.array([[ (1/imu_hz)**2, 0, 0 ],
+              [ 0, (1/imu_hz)**2, 0 ],
+              [ 0, 0, (1/imu_hz)**2 ],
+              [ (1/imu_hz), 0, 0 ],
+              [ 0, (1/imu_hz), 0 ],
+              [ 0, 0, (1/imu_hz) ]])
 
 beacons = np.array([[ -5, 5, 0.1 ],
                     [ -5, -5, 3 ],
                     [ 5, -5, 0.15 ]])
 
 
-def rover_state_update(x_n):
+def rover_state_update(x_n, acc_measurement):
 
-    return A @ x_n
+    return A @ x_n + B @ acc_measurement
 
 def rover_jacobian():
 
     # since state model is linear just return A
     return A
 
-def ekf_predict_t(x_n, P_n):
+def ekf_predict_t(x_n, P_n, acc_measurement):
 
     # prediction
-    x_pred_n = rover_state_update(x_n)
+    x_pred_n = rover_state_update(x_n, acc_measurement)
 
     # uncertainty propagation
     rover_jacobian_n = rover_jacobian()

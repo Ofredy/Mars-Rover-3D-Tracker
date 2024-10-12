@@ -22,7 +22,6 @@ def rover_x_dot(x_n, acceleration_n):
     return np.concatenate(( 
                            x_n[3:6],
                            acceleration_n,
-                           np.zeros(3)
                          ))
 
 def runge_kutta(get_x_dot, x_0, t_0, t_f, dt=0.1):
@@ -30,6 +29,7 @@ def runge_kutta(get_x_dot, x_0, t_0, t_f, dt=0.1):
     # EXTRA -> Add attitude
 
     state_summary = np.zeros(shape=((int(simulation_time/(1/simulation_hz)), NUM_STATES))) 
+    acceleration_summary =  np.zeros(shape=((int(simulation_time/(1/simulation_hz)), 3))) 
 
     t = t_0
     time_step_idx = 0
@@ -42,9 +42,8 @@ def runge_kutta(get_x_dot, x_0, t_0, t_f, dt=0.1):
                                  np.random.normal(0, 0.1),  # Random acceleration in y,
                                  0.0])                       # Zero acceleration in z direction
 
-        x_n[6:9] = acceleration
-
         state_summary[time_step_idx] = x_n
+        acceleration_summary[time_step_idx] = acceleration
 
         time_step_idx += 1
 
@@ -59,7 +58,8 @@ def runge_kutta(get_x_dot, x_0, t_0, t_f, dt=0.1):
 
         t += dt
 
-    return state_summary
+    return { 'state_sum': state_summary,
+             'acc_sum': acceleration_summary }
 
 def generate_rover_trajectories():
 
@@ -69,9 +69,9 @@ def generate_rover_trajectories():
 
         initial_state = np.random.normal(0, initial_state_std, size=NUM_STATES)
 
-        temp_state_sum = runge_kutta(rover_x_dot, initial_state, 0, simulation_time, (1/simulation_hz))
+        temp_monte_sum = runge_kutta(rover_x_dot, initial_state, 0, simulation_time, (1/simulation_hz))
 
-        rover_trajectories.append({'state_sum': temp_state_sum})
+        rover_trajectories.append(temp_monte_sum)
 
     return rover_trajectories
 
@@ -80,8 +80,10 @@ def add_process_noise_to_rover_trajectories(rover_trajectories):
     for monte_idx, run_hash in enumerate(rover_trajectories):
 
         run_hash['state_sum'] += np.random.normal(0, np.sqrt(process_noise_variance))
+        run_hash['acc_sum'] += np.random.normal(0, np.sqrt(process_noise_variance))
         
         rover_trajectories[monte_idx]['state_sum'] = run_hash['state_sum']
+        rover_trajectories[monte_idx]['acc_sum'] = run_hash['acc_sum']
 
     return rover_trajectories
 
@@ -112,8 +114,9 @@ def rover_ekf_simulations(rover_trajectories):
     for run_idx in range(NUM_MONTE_RUNS):
 
         run_states = rover_trajectories[run_idx]['state_sum']
+        run_acc = rover_trajectories[run_idx]['acc_sum']
 
-        x_n, P_n = state_init()
+        x_n, P_n = run_states[0], np.eye(NUM_STATES) * process_noise_variance
 
         estimate_counter = 0
 
@@ -122,12 +125,15 @@ def rover_ekf_simulations(rover_trajectories):
 
         for time_step_idx in range(int(simulation_time/(1/simulation_hz))):
 
-            if time_step_idx % (1/imu_hz) == 0:
+            imu_rate_idx = (1/imu_hz) / (1/simulation_hz)
+
+            if time_step_idx % imu_rate_idx == 0:
 
                 # state prediction
-                x_pred_n, P_pred_n = ekf_predict_t(x_n, P_n)
+                acc_measurement = run_acc[time_step_idx]
+                x_pred_n, P_pred_n = ekf_predict_t(x_n, P_n, acc_measurement)
 
-                if time_step_idx % (1/ranging_hz) == 0:
+                if False:
 
                     # state update
                     ranging_buffer[beacon_idx] = np.linalg.norm(run_states[time_step_idx][0:3] - beacons[beacon_idx]) + np.random.normal(0, np.sqrt(measurement_noise_variance))
@@ -138,7 +144,7 @@ def rover_ekf_simulations(rover_trajectories):
 
                     x_n = x_pred_n
                     P_n = P_pred_n
-
+                    
                 monte_ekf_estimates[run_idx][estimate_counter] = x_n
                 monte_covaraince_time_steps[run_idx][estimate_counter] = P_n
 
@@ -151,6 +157,26 @@ def rover_ekf_simulations(rover_trajectories):
                     'monte_covariance_time_steps': monte_covaraince_time_steps }
 
     return ekf_sim_sum
+
+def plot_rover_ekf_estimate(ekf_sim_sum):
+
+    fig, axs = plt.subplots(3, figsize=(10, 12), sharex=True)
+
+    state_labels = ['x', 'y', 'z', 'x_dot', 'y_dot', 'z_dot']
+
+    t = np.arange(0, simulation_time, (1/imu_hz))
+
+    rover_truth_states = ekf_sim_sum['rover_trajectories'][0]['state_sum']
+    time_indices = np.arange(int(simulation_time/(1/simulation_hz))) % int((1/imu_hz)/(1/simulation_hz)) == 0
+    
+    rover_truth_states = rover_truth_states[time_indices]
+    ekf_estimates = ekf_sim_sum['monte_ekf_estimates'][0]
+
+    for state_idx in range(NUM_STATES-3):
+
+        axs[state_idx].plot(t, rover_truth_states[:, state_idx], label=f'{state_labels[state_idx]} Truth', color='k')
+        axs[state_idx].plot(t, ekf_estimates[:, state_idx], label=f'{state_labels[state_idx]} Estimate', color='k')
+        
 
 def plot_rover_ekf_error(ekf_sim_sum):
 
@@ -169,7 +195,7 @@ def plot_rover_ekf_error(ekf_sim_sum):
 
         state_errors = rover_truth_states[time_indices] - ekf_estimates
 
-        for state_idx in range(NUM_STATES-6):    
+        for state_idx in range(NUM_STATES-3):    
 
             confidence_interval_upper = state_errors[:, state_idx] + 3 * covariance_time_steps[:, state_idx, state_idx]
             confidence_interval_lower = state_errors[:, state_idx] - 3 * covariance_time_steps[:, state_idx, state_idx]
@@ -197,8 +223,7 @@ if __name__ == "__main__":
     rover_trajectories = add_process_noise_to_rover_trajectories(rover_trajectories)
 
     ekf_sim_sum = rover_ekf_simulations(rover_trajectories)
-    plot_rover_ekf_error(ekf_sim_sum)
 
-    plot_rover_trajectory(rover_trajectories, fig_num=2)
+    plot_rover_ekf_error(ekf_sim_sum)
 
     plt.show()
