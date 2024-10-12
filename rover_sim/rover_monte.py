@@ -126,6 +126,7 @@ def rover_ekf_simulations(rover_trajectories):
         for time_step_idx in range(int(simulation_time/(1/simulation_hz))):
 
             imu_rate_idx = (1/imu_hz) / (1/simulation_hz)
+            ranging_rate_idx = (1/ranging_hz) / (1/simulation_hz)
 
             if time_step_idx % imu_rate_idx == 0:
 
@@ -133,7 +134,7 @@ def rover_ekf_simulations(rover_trajectories):
                 acc_measurement = run_acc[time_step_idx]
                 x_pred_n, P_pred_n = ekf_predict_t(x_n, P_n, acc_measurement)
 
-                if False:
+                if time_step_idx % ranging_rate_idx == 0:
 
                     # state update
                     ranging_buffer[beacon_idx] = np.linalg.norm(run_states[time_step_idx][0:3] - beacons[beacon_idx]) + np.random.normal(0, np.sqrt(measurement_noise_variance))
@@ -157,26 +158,6 @@ def rover_ekf_simulations(rover_trajectories):
                     'monte_covariance_time_steps': monte_covaraince_time_steps }
 
     return ekf_sim_sum
-
-def plot_rover_ekf_estimate(ekf_sim_sum):
-
-    fig, axs = plt.subplots(3, figsize=(10, 12), sharex=True)
-
-    state_labels = ['x', 'y', 'z', 'x_dot', 'y_dot', 'z_dot']
-
-    t = np.arange(0, simulation_time, (1/imu_hz))
-
-    rover_truth_states = ekf_sim_sum['rover_trajectories'][0]['state_sum']
-    time_indices = np.arange(int(simulation_time/(1/simulation_hz))) % int((1/imu_hz)/(1/simulation_hz)) == 0
-    
-    rover_truth_states = rover_truth_states[time_indices]
-    ekf_estimates = ekf_sim_sum['monte_ekf_estimates'][0]
-
-    for state_idx in range(NUM_STATES-3):
-
-        axs[state_idx].plot(t, rover_truth_states[:, state_idx], label=f'{state_labels[state_idx]} Truth', color='k')
-        axs[state_idx].plot(t, ekf_estimates[:, state_idx], label=f'{state_labels[state_idx]} Estimate', color='k')
-        
 
 def plot_rover_ekf_error(ekf_sim_sum):
 

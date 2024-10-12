@@ -3,14 +3,14 @@ import numpy as np
 
 
 ######### ekf constants #########
-imu_hz = 10
-ranging_hz = 0
+imu_hz = 20
+ranging_hz = 10
 
 NUM_STATES = 6
 NUM_RANGING_MEASUREMENTS = 3
 process_noise_variance = 0.01
 measurement_noise_variance = 0.01
-x_0_guess_variance = 0.01
+x_0_guess_variance = 2
 Q = np.eye(NUM_STATES) * process_noise_variance * (1/imu_hz)
 R = np.eye(NUM_RANGING_MEASUREMENTS) * measurement_noise_variance
 
@@ -62,9 +62,9 @@ def observation_jacobian(x_pred_n):
 
     estimate_ranges = get_estimate_ranges(x_pred_n)
 
-    return np.array([[ ( x_pred_n[0] ) / estimate_ranges[0], ( x_pred_n[1] ) / estimate_ranges[0], ( x_pred_n[2] ) / estimate_ranges[0], 0, 0, 0, 0, 0, 0 ],
-                     [ ( x_pred_n[0] ) / estimate_ranges[1], ( x_pred_n[1] ) / estimate_ranges[1], ( x_pred_n[2] ) / estimate_ranges[1], 0, 0, 0, 0, 0, 0 ],
-                     [ ( x_pred_n[0] ) / estimate_ranges[2], ( x_pred_n[1] ) / estimate_ranges[2], ( x_pred_n[2] ) / estimate_ranges[2], 0, 0, 0, 0, 0, 0 ]])
+    return np.array([[ ( x_pred_n[0] ) / estimate_ranges[0], ( x_pred_n[1] ) / estimate_ranges[0], ( x_pred_n[2] ) / estimate_ranges[0], 0, 0, 0 ],
+                     [ ( x_pred_n[0] ) / estimate_ranges[1], ( x_pred_n[1] ) / estimate_ranges[1], ( x_pred_n[2] ) / estimate_ranges[1], 0, 0, 0 ],
+                     [ ( x_pred_n[0] ) / estimate_ranges[2], ( x_pred_n[1] ) / estimate_ranges[2], ( x_pred_n[2] ) / estimate_ranges[2], 0, 0, 0 ]])
 
 def ekf_update_t(x_pred_n, P_pred_n, z):
 
