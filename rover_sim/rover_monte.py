@@ -9,10 +9,12 @@ from rover_ekf import *
 ######### monte constants #########
 NUM_MONTE_RUNS = 50
 
+acceleration_std = np.sqrt(process_noise_variance)
+
 initial_state_std = 0.1
 
 simulation_time = 20 # s
-simulation_hz = 20
+simulation_hz = 100
 
 
 def rover_x_dot(x_n, acceleration_n):
@@ -21,7 +23,7 @@ def rover_x_dot(x_n, acceleration_n):
 
     return np.concatenate(( 
                            x_n[3:6],
-                           acceleration_n,
+                           acceleration_n
                          ))
 
 def runge_kutta(get_x_dot, x_0, t_0, t_f, dt=0.1):
@@ -38,8 +40,8 @@ def runge_kutta(get_x_dot, x_0, t_0, t_f, dt=0.1):
     while t < t_f:
 
         # Generate random acceleration (constant during the whole time step)
-        acceleration = np.array([np.random.normal(0, 0.1),  # Random acceleration in x,
-                                 np.random.normal(0, 0.1),  # Random acceleration in y,
+        acceleration = np.array([np.random.normal(0, np.sqrt(acceleration_std)),  # Random acceleration in x,
+                                 np.random.normal(0, np.sqrt(acceleration_std)),  # Random acceleration in y,
                                  0.0])                       # Zero acceleration in z direction
 
         state_summary[time_step_idx] = x_n
@@ -80,10 +82,8 @@ def add_process_noise_to_rover_trajectories(rover_trajectories):
     for monte_idx, run_hash in enumerate(rover_trajectories):
 
         run_hash['state_sum'] += np.random.normal(0, np.sqrt(process_noise_variance))
-        run_hash['acc_sum'] += np.random.normal(0, np.sqrt(process_noise_variance))
         
         rover_trajectories[monte_idx]['state_sum'] = run_hash['state_sum']
-        rover_trajectories[monte_idx]['acc_sum'] = run_hash['acc_sum']
 
     return rover_trajectories
 
@@ -105,13 +105,13 @@ def state_init():
 
     return np.array([np.random.normal(0, np.sqrt(x_0_guess_variance), size=NUM_STATES)]).reshape(-1), \
            np.array([
-                        [(1/imu_hz)**4 / 4, 0, 0, (1/imu_hz)**3 / 2, 0, 0],
-                        [0, (1/imu_hz)**4 / 4, 0, 0, (1/imu_hz)**3 / 2, 0],
-                        [0, 0, (1/imu_hz)**4 / 4, 0, 0, (1/imu_hz)**3 / 2],
-                        [(1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)**2, 0, 0],
-                        [0, (1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)**2, 0],
-                        [0, 0, (1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)**2]
-                    ]) * x_0_guess_variance 
+                 [(1/imu_hz)**4 / 3, 0, 0, (1/imu_hz)**3 / 2, 0, 0],
+                 [0, (1/imu_hz)**4 / 3, 0, 0, (1/imu_hz)**3 / 2, 0],
+                 [0, 0, (1/imu_hz)**4 / 3, 0, 0, (1/imu_hz)**3 / 2],
+                 [(1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)/2, 0, 0],
+                 [0, (1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)/2, 0],
+                 [0, 0, (1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)/2]
+             ]) * np.sqrt(x_0_guess_variance)
 
 def rover_ekf_simulations(rover_trajectories):
 
@@ -123,14 +123,7 @@ def rover_ekf_simulations(rover_trajectories):
         run_states = rover_trajectories[run_idx]['state_sum']
         run_acc = rover_trajectories[run_idx]['acc_sum']
 
-        x_n, P_n = run_states[0], np.array([
-                                                [(1/imu_hz)**4 / 4, 0, 0, (1/imu_hz)**3 / 2, 0, 0],
-                                                [0, (1/imu_hz)**4 / 4, 0, 0, (1/imu_hz)**3 / 2, 0],
-                                                [0, 0, (1/imu_hz)**4 / 4, 0, 0, (1/imu_hz)**3 / 2],
-                                                [(1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)**2, 0, 0],
-                                                [0, (1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)**2, 0],
-                                                [0, 0, (1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)**2]
-                                            ]) * process_noise_variance
+        x_n, P_n = state_init()
         estimate_counter = 0
 
         beacon_idx = 0
