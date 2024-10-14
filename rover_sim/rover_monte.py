@@ -104,7 +104,14 @@ def plot_rover_trajectory(rover_trajectories, fig_num=1):
 def state_init():
 
     return np.array([np.random.normal(0, np.sqrt(x_0_guess_variance), size=NUM_STATES)]).reshape(-1), \
-           np.eye(NUM_STATES) * x_0_guess_variance
+           np.array([
+                        [(1/imu_hz)**4 / 4, 0, 0, (1/imu_hz)**3 / 2, 0, 0],
+                        [0, (1/imu_hz)**4 / 4, 0, 0, (1/imu_hz)**3 / 2, 0],
+                        [0, 0, (1/imu_hz)**4 / 4, 0, 0, (1/imu_hz)**3 / 2],
+                        [(1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)**2, 0, 0],
+                        [0, (1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)**2, 0],
+                        [0, 0, (1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)**2]
+                    ]) * x_0_guess_variance 
 
 def rover_ekf_simulations(rover_trajectories):
 
@@ -116,8 +123,14 @@ def rover_ekf_simulations(rover_trajectories):
         run_states = rover_trajectories[run_idx]['state_sum']
         run_acc = rover_trajectories[run_idx]['acc_sum']
 
-        x_n, P_n = run_states[0], np.eye(NUM_STATES) * process_noise_variance
-
+        x_n, P_n = run_states[0], np.array([
+                                                [(1/imu_hz)**4 / 4, 0, 0, (1/imu_hz)**3 / 2, 0, 0],
+                                                [0, (1/imu_hz)**4 / 4, 0, 0, (1/imu_hz)**3 / 2, 0],
+                                                [0, 0, (1/imu_hz)**4 / 4, 0, 0, (1/imu_hz)**3 / 2],
+                                                [(1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)**2, 0, 0],
+                                                [0, (1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)**2, 0],
+                                                [0, 0, (1/imu_hz)**3 / 2, 0, 0, (1/imu_hz)**2]
+                                            ]) * process_noise_variance
         estimate_counter = 0
 
         beacon_idx = 0
@@ -134,18 +147,22 @@ def rover_ekf_simulations(rover_trajectories):
                 acc_measurement = run_acc[time_step_idx]
                 x_pred_n, P_pred_n = ekf_predict_t(x_n, P_n, acc_measurement)
 
+                error = np.linalg.norm(x_n - run_states[time_step_idx])
+
                 if time_step_idx % ranging_rate_idx == 0:
 
                     # state update
-                    ranging_buffer[beacon_idx] = np.linalg.norm(run_states[time_step_idx][0:3] - beacons[beacon_idx]) + np.random.normal(0, np.sqrt(measurement_noise_variance))
+                    ranging_buffer = np.linalg.norm( run_states[time_step_idx][0:3] - beacons, axis=1 )
 
-                    x_n, P_n, k_n = ekf_update_t(x_pred_n, P_pred_n, ranging_buffer)
+                    x_n, P_n = ekf_update_t(x_pred_n, P_pred_n, ranging_buffer)
 
                 else:
 
                     x_n = x_pred_n
                     P_n = P_pred_n
                     
+                error = np.linalg.norm(x_n - run_states[time_step_idx])
+
                 monte_ekf_estimates[run_idx][estimate_counter] = x_n
                 monte_covaraince_time_steps[run_idx][estimate_counter] = P_n
 
