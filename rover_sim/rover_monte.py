@@ -206,7 +206,7 @@ def plot_rover_ekf_error(ekf_sim_sum, fig_num=1):
         state_errors = rover_truth_states[time_indices] - ekf_estimates
 
         if run_idx == 0:
-            plt.plot(t, np.linalg.norm(state_errors, axis=1), label=f'State Error', color='k')
+            plt.plot(t, np.linalg.norm(state_errors, axis=1), label=f'Total State Error', color='k')
             plt.xlabel('Time [s]')
             plt.ylabel('Error')
             plt.legend(loc='upper right')
@@ -263,7 +263,8 @@ if __name__ == "__main__":
 
     ekf_sim_sum = rover_ekf_simulations(rover_trajectories)
 
-    plot_rover_ekf_error(ekf_sim_sum)
+    plot_rover_trajectory(rover_trajectories, fig_num=1)
+    plot_rover_ekf_error(ekf_sim_sum, fig_num=2)
     plot_rover_position_error(ekf_sim_sum)
 
     plt.show()
