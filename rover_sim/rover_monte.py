@@ -213,8 +213,48 @@ def plot_rover_ekf_error(ekf_sim_sum, fig_num=1):
             plt.grid(True)
 
         else:
-             plt.plot(t, np.linalg.norm(state_errors, axis=1), color='k')
-    
+            plt.plot(t, np.linalg.norm(state_errors, axis=1), color='k')
+
+def plot_rover_position_error(ekf_sim_sum):
+
+    fig, axs = plt.subplots(3, figsize=(10, 12), sharex=True)
+
+    state_labels = [ 'x', 'vx', 'ax', 'y', 'vy', 'ay', 'z', 'vz', 'az' ]
+
+    t = np.arange(0, simulation_time, (1/imu_hz)) if imu_hz > ranging_hz else np.arange(0, simulation_time, (1/ranging_hz))
+
+    for run_idx in range(NUM_MONTE_RUNS):
+
+        rover_truth_states = ekf_sim_sum['rover_trajectories'][run_idx]['state_sum']
+        time_indices = np.arange(int(simulation_time/(1/simulation_hz))) % int((1/imu_hz)/(1/simulation_hz)) == 0 if imu_hz > ranging_hz else np.arange(int(simulation_time/(1/simulation_hz))) % int((1/ranging_hz)/(1/simulation_hz)) == 0
+        ekf_estimates = ekf_sim_sum['monte_ekf_estimates'][run_idx]
+        covariance_time_steps = ekf_sim_sum['monte_covariance_time_steps'][run_idx]
+
+        state_errors = rover_truth_states[time_indices] - ekf_estimates
+
+        for state_idx in range(3):    
+
+            position_idx = [0, 3, 6]
+
+            confidence_interval_upper = state_errors[:, position_idx[state_idx]] + 3 * covariance_time_steps[:, position_idx[state_idx], position_idx[state_idx]]
+            confidence_interval_lower = state_errors[:, position_idx[state_idx]] - 3 * covariance_time_steps[:, position_idx[state_idx], position_idx[state_idx]]
+
+            if run_idx == 0:
+                axs[state_idx].plot(t, state_errors[:, position_idx[state_idx]], label=f'{state_labels[position_idx[state_idx]]} Error', color='k')
+                axs[state_idx].fill_between(t, confidence_interval_lower, confidence_interval_upper, color='y', alpha=0.5, label='3-σ Uncertainty in Theta')
+                axs[state_idx].set_ylabel('Error')
+                axs[state_idx].legend(loc='upper right')
+                axs[state_idx].grid(True)
+
+            else:
+                axs[state_idx].plot(t, state_errors[:, state_idx], color='k')
+                axs[state_idx].fill_between(t, confidence_interval_lower, confidence_interval_upper, color='y', alpha=0.5)
+
+        if run_idx == 0:
+            axs[-1].set_xlabel('Time')
+
+        fig.suptitle('State Errors Over Time', fontsize=16)
+
 
 if __name__ == "__main__":
 
@@ -224,5 +264,6 @@ if __name__ == "__main__":
     ekf_sim_sum = rover_ekf_simulations(rover_trajectories)
 
     plot_rover_ekf_error(ekf_sim_sum)
+    plot_rover_position_error(ekf_sim_sum)
 
     plt.show()
