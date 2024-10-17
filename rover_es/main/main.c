@@ -12,6 +12,9 @@
 #include "esp_chip_info.h"
 #include "esp_flash.h"
 
+#include "../include/C-Linear-Algebra/matrix.h"
+#include "../include/C-Linear-Algebra/matrixadv.h"
+
 void app_main(void)
 {
     printf("Hello world!\n");
