@@ -5,22 +5,44 @@
 #include "../C-Linear-Algebra/matrixadv.h"
 #include "helper_functions.h"
 
-
+#define NUM_BEACONS 3
 #define X0_Variance 2
 
+extern int imu_hz;
 
-matrix* rover_init();
+extern double measurement_noise_var;
 
-matrix* rover_state_update();
+extern double beacons[NUM_BEACONS][3];
 
-matrix* rover_jacobian();
+void rover_ekf_init(matrix *x_n, matrix* A, matrix* B, matrix* Q, matrix* Q_n);
 
-matrix* rover_ekf_predict();
+void init_position(matrix *x_n);
 
-matrix* get_range_estimate();
+void init_Q_n(matrix* Q, matrix *Q_n);
 
-matrix* observation_jacobian();
+void create_process_noise_matrix(matrix* Q);
 
-matrix* rover_ekf_update();
+void create_A_matrix(matrix* A);
+
+void create_B_matrix(matrix* B);
+
+void rover_ekf_predict(matrix *x_n, matrix *Q_n, const double *imu_buffer, matrix *A, matrix *B, matrix *Q);
+
+void rover_state_update(matrix *x_n, const double *imu_buffer, matrix *A, matrix *B);
+
+matrix* create_u_vector(const double *imu_buffer);
+
+void update_Q_n_prediction(matrix *Q_n, matrix *A, matrix *Q);
+
+void rover_ekf_update(matrix *x_n, matrix *Q_n, const double ranging_buffer, const double range_measurement, const int beacon_idx,
+                      matrix *A, matrix *B, matrix *Q);
+
+double get_range_estimate(matrix *x_n, const int beacon_idx);
+
+matrix* get_observation_jacobian(matrix *x_n, const int beacon_idx, const double range_estimate);
+
+matrix* calculate_kalman_gain(matrix *Q_n, matrix *H);
+
+void update_Q_n(matrix *Q_n, matrix *H, matrix *k_n);
 
 #endif
