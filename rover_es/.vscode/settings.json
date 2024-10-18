@@ -2,6 +2,7 @@
   "C_Cpp.intelliSenseEngine": "default",
   "idf.adapterTargetName": "esp32",
   "files.associations": {
-    "rover_ekf.h": "c"
+    "rover_ekf.h": "c",
+    "matrixadv.h": "c"
   }
 }
