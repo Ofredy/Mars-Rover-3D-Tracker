@@ -1,6 +1,10 @@
 #ifndef _ROVER_EKF_
 #define _ROVER_EKF_
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>  
+
 #include "../C-Linear-Algebra/matrix.h"
 #include "../C-Linear-Algebra/matrixadv.h"
 #include "helper_functions.h"
@@ -18,7 +22,7 @@ void rover_ekf_init(matrix *x_n, matrix* A, matrix* B, matrix* Q, matrix* Q_n);
 
 void init_position(matrix *x_n);
 
-void init_Q_n(matrix* Q, matrix *Q_n);
+void init_Q_n(matrix *Q_n);
 
 void create_process_noise_matrix(matrix* Q);
 
@@ -34,7 +38,7 @@ matrix* create_u_vector(const double *imu_buffer);
 
 void update_Q_n_prediction(matrix *Q_n, matrix *A, matrix *Q);
 
-void rover_ekf_update(matrix *x_n, matrix *Q_n, const double ranging_buffer, const double range_measurement, const int beacon_idx,
+void rover_ekf_update(matrix *x_n, matrix *Q_n, const double ranging_buffer, const int beacon_idx,
                       matrix *A, matrix *B, matrix *Q);
 
 double get_range_estimate(matrix *x_n, const int beacon_idx);
