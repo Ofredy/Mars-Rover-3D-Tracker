@@ -181,7 +181,7 @@ void update_Q_n_prediction(matrix *Q_n, matrix *A, matrix *Q)
 
     // Update Q_n with the sum of temp_2 and Q
     for (int i = 0; i < NUM_STATES * NUM_STATES; i++) {
-        Q_n->data[i] += temp_2->data[i];
+        Q_n->data[i] = temp_2->data[i] + Q->data[i];
     }
 
     // Free temporary matrices
@@ -194,12 +194,14 @@ void rover_ekf_update(matrix *x_n, matrix *Q_n, const double ranging_buffer, con
 {
     double range_estimate = get_range_estimate(x_n, beacon_idx);
     matrix *H = get_observation_jacobian(x_n, beacon_idx, range_estimate);
-    
+
     matrix *k_n = calculate_kalman_gain(Q_n, H);
 
     // Update x_n with the new estimate
     matrix *scaled_k_n = scaleMatrix(k_n, (ranging_buffer - range_estimate));
-    x_n = addVector(x_n, scaled_k_n); // Ensure addVector handles memory properly
+    addMatrixInPlace(x_n, scaled_k_n); // Ensure addVector handles memory properly
+
+    update_Q_n(Q_n, H, k_n);
 
     // Free temporary matrices
     freeMatrix(H);
@@ -246,8 +248,11 @@ matrix* calculate_kalman_gain(matrix *Q_n, matrix *H)
     matrix *temp2 = multiplyMatrix(H, Q_n);
     matrix *temp3 = multiplyMatrix(temp2, transposeMatrix(H));
 
-    double *ptr = temp3->data;
-    double gain = 1 / (*ptr + measurement_noise_var);
+    double R = measurement_noise_var * sqrt(measurement_noise_var);
+    double gain = 1 / (temp3->data[0] + R);
+
+    freeMatrix(temp2);
+    freeMatrix(temp3);
 
     return scaleMatrix(temp1, gain);
 }
@@ -266,10 +271,13 @@ void update_Q_n(matrix *Q_n, matrix *H, matrix *k_n)
 
     // temp4 = k_n * k_n^T
     matrix *temp_4 = multiplyMatrix(k_n, transposeMatrix(k_n));
-    double value = (*temp_4->data) * measurement_noise_var;
+    double R = measurement_noise_var * sqrt(measurement_noise_var);
+    temp_4 = scaleMatrix(temp_4, R);
 
-    // Update Q_n with temp3 + value
-    Q_n = addScalar(temp_3, value);
+    // temp5 = temp3 + temp4
+    matrix *temp_5 = addMatrix(temp_3, temp_4);
+
+    memcpy(Q_n->data, temp_5->data, NUM_STATES * NUM_STATES * sizeof(double));
 
     // Free temporary matrices
     freeMatrix(I);
@@ -277,4 +285,5 @@ void update_Q_n(matrix *Q_n, matrix *H, matrix *k_n)
     freeMatrix(temp_2);
     freeMatrix(temp_3);
     freeMatrix(temp_4);
+    freeMatrix(temp_5);
 }

@@ -17,7 +17,7 @@ int main()
 
     rover_ekf_predict(x_n, Q_n, imu_buffer, A, B, Q);
 
-    rover_ekf_update(x_n, Q_n, 3, 0, A, B, Q);
+    rover_ekf_update(x_n, Q_n, 3, 2, A, B, Q);
 
     printf("x_n");
     printMatrix(x_n);
