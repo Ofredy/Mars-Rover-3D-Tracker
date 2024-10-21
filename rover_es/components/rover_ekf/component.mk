@@ -1,0 +1,2 @@
+COMPONENT_ADD_INCLUDEDIRS = "." "../C-Linear-Algebra"
+COMPONENT_DEPENDS = 
