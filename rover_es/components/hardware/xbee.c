@@ -24,16 +24,13 @@ void xbee_init()
     ESP_ERROR_CHECK(uart_set_pin(XBEE_PORT_NUM, XBEE_TXD, XBEE_RXD, XBEE_RTS, XBEE_CTS));
 }
 
+// change to interrupt
 char* xbee_read()
 {
-    // Configure a temporary buffer for the incoming data
-    uint8_t *data = (uint8_t *) malloc(BUF_SIZE);
-
-    // Read data from the UART
-    return (char*) uart_read_bytes(XBEE_PORT_NUM, data, (BUF_SIZE - 1), 20 / portTICK_PERIOD_MS);
+    return (char *) "";
 }
 
 void xbee_send(const char* message)
 {
-    uart_write_bytes(XBEE_PORT_NUM, message, sizeof(message)/sizeof(char));
+    uart_write_bytes(XBEE_PORT_NUM, message, strlen(message));
 }

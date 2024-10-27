@@ -18,6 +18,17 @@
 
 #define NUM_STATES 9
 
+static void xbee_test_task(void *arg)
+{
+    xbee_init();
+
+    while (1) 
+    {
+        xbee_send("test\n");
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
 void app_main(void)
 {
     matrix *x_n = makeMatrix(1, NUM_STATES);
@@ -40,11 +51,5 @@ void app_main(void)
     printf("Q_n");
     printMatrix(Q_n);
 
-    xbee_init();
-
-    while( true )
-    {
-        xbee_send("test");
-    }
-
+    xTaskCreate(xbee_test_task, "xbee_task", XBEE_TASK_SIZE, NULL, 10, NULL);
 }
