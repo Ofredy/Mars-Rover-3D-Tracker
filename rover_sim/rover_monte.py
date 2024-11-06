@@ -9,7 +9,7 @@ from rover_ekf import *
 ######### monte constants #########
 NUM_MONTE_RUNS = 50
 
-acceleration_std = 0.1
+acceleration_std = 0.3
 
 initial_state_std = 0.01
 
@@ -98,7 +98,7 @@ def add_process_noise_to_rover_trajectories(rover_trajectories):
 
     return rover_trajectories
 
-def plot_rover_trajectory(rover_trajectories, fig_num=1):
+def plot_rover_trajectory(rover_trajectories, fig_num=1, save_as_png=False, dpi=300):
 
     plt.figure(fig_num)
 
@@ -111,6 +111,10 @@ def plot_rover_trajectory(rover_trajectories, fig_num=1):
     ax.set_xlabel('X Position')
     ax.set_ylabel('Y Position')
     ax.set_zlabel('Z Position') 
+
+    # Save as PNG with higher DPI if requested
+    if save_as_png:
+        plt.savefig(f'rover_trajectories.png', format='png', dpi=dpi)
 
 def state_init():
 
@@ -191,7 +195,7 @@ def rover_ekf_simulations(rover_trajectories):
 
     return ekf_sim_sum
 
-def plot_rover_ekf_error(ekf_sim_sum, fig_num=1):
+def plot_rover_ekf_error(ekf_sim_sum, fig_num=1, save_as_png=False, dpi=300):
 
     plt.figure(fig_num)
 
@@ -215,7 +219,11 @@ def plot_rover_ekf_error(ekf_sim_sum, fig_num=1):
         else:
             plt.plot(t, np.linalg.norm(state_errors, axis=1), color='k')
 
-def plot_rover_position_error(ekf_sim_sum):
+    # Save as PNG with higher DPI if requested
+    if save_as_png:
+        plt.savefig(f'rover_ekf_error.png', format='png', dpi=dpi)
+
+def plot_rover_position_error(ekf_sim_sum, save_as_png=False, dpi=300):
 
     fig, axs = plt.subplots(3, figsize=(10, 12), sharex=True)
 
@@ -255,6 +263,10 @@ def plot_rover_position_error(ekf_sim_sum):
 
         fig.suptitle('State Errors Over Time', fontsize=16)
 
+    # Save as PNG with higher DPI if requested
+    if save_as_png:
+        plt.savefig('rover_position_error.png', format='png', dpi=dpi)
+
 
 if __name__ == "__main__":
 
@@ -263,8 +275,8 @@ if __name__ == "__main__":
 
     ekf_sim_sum = rover_ekf_simulations(rover_trajectories)
 
-    plot_rover_trajectory(rover_trajectories, fig_num=1)
-    plot_rover_ekf_error(ekf_sim_sum, fig_num=2)
-    plot_rover_position_error(ekf_sim_sum)
+    plot_rover_trajectory(rover_trajectories, fig_num=1, save_as_png=True)
+    plot_rover_ekf_error(ekf_sim_sum, fig_num=2, save_as_png=True)
+    plot_rover_position_error(ekf_sim_sum, save_as_png=True)
 
     plt.show()
