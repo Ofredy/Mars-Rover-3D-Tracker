@@ -255,7 +255,7 @@ def plot_rover_position_error(ekf_sim_sum, save_as_png=False, dpi=300):
                 axs[state_idx].grid(True)
 
             else:
-                axs[state_idx].plot(t, state_errors[:, state_idx], color='k')
+                axs[state_idx].plot(t, state_errors[:, position_idx[state_idx]], color='k')
                 axs[state_idx].fill_between(t, confidence_interval_lower, confidence_interval_upper, color='y', alpha=0.5)
 
         if run_idx == 0:
