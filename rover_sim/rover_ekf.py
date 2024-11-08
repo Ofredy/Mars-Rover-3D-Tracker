@@ -3,18 +3,18 @@ import numpy as np
 
 
 ######### ekf constants #########
-imu_hz = 25
-ranging_hz = 50
+imu_hz = 100
+ranging_hz = 25
 
 NUM_STATES = 9
-process_noise_variance = 0.0125
+process_noise_variance = 0.125
 measurement_noise_variance = 0.01
-x_0_guess_variance = 2
+x_0_guess_variance = 3
 
 # Time step T is now 1/imu_hz
 T = 1 / imu_hz
-tau_a = 0.0001    # Replace with actual tau_a
-tau_b = 0.0001    # Replace with actual tau_b
+tau_a = process_noise_variance    # Replace with actual tau_a
+tau_b = process_noise_variance    # Replace with actual tau_b
 
 # Process noise submatrix Q0 for each axis, replacing T with 1/imu_hz
 Q0 = np.array([
@@ -28,7 +28,7 @@ Q = np.block([
     [Q0, np.zeros_like(Q0), np.zeros_like(Q0)],  # x-axis
     [np.zeros_like(Q0), Q0, np.zeros_like(Q0)],  # y-axis
     [np.zeros_like(Q0), np.zeros_like(Q0), Q0]   # z-axis
-])
+]) 
 
 R = measurement_noise_variance * np.sqrt(measurement_noise_variance)
 
@@ -60,10 +60,12 @@ B = np.block([
     [np.zeros((3, 3)), np.zeros((3, 3)), B0_k]
 ])
 
-NUM_BEACONS = 3
-beacons = np.array([[ -10.0,  10.0,  0.0 ],   # Beacon 1
-                    [  10.0,  10.0,  0.0 ],   # Beacon 2
-                    [  0.0,  -10.0,  0.0 ]])  # Beacon 3
+NUM_BEACONS = 5
+beacons = np.array([ [ -10.0, 10.0,  0.0 ],   # Beacon 1
+                     [  10.0, 10.0,  0.0 ],   # Beacon 2
+                     [  0.0, -10.0,  0.0 ],
+                     [  -10.0, -10.0, -5.0 ],
+                     [  10.0, -10.0,  5.0 ] ]) 
 
 
 def rover_state_update(x_n, acc_measurement):

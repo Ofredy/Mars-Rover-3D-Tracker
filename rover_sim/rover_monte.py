@@ -1,6 +1,10 @@
+# system imports
+from collections import deque
+
 # library imports
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 # our imports
 from rover_ekf import *
@@ -118,8 +122,8 @@ def plot_rover_trajectory(rover_trajectories, fig_num=1, save_as_png=False, dpi=
 
 def state_init():
 
-    tau_a = np.sqrt(x_0_guess_variance)    # Replace with actual tau_a
-    tau_b = np.sqrt(x_0_guess_variance)    # Replace with actual tau_b
+    tau_a = np.sqrt(x_0_guess_variance)   
+    tau_b = np.sqrt(x_0_guess_variance)   
 
     # Process noise submatrix Q0 for each axis, replacing T with 1/imu_hz
     Q0 = np.array([
@@ -136,7 +140,7 @@ def state_init():
     ])
 
     return np.array([np.random.normal(0, np.sqrt(x_0_guess_variance), size=NUM_STATES)]).reshape(-1), \
-           P_n
+           np.eye(NUM_STATES) * np.sqrt(x_0_guess_variance)
 
 def rover_ekf_simulations(rover_trajectories):
 
@@ -213,6 +217,7 @@ def plot_rover_ekf_error(ekf_sim_sum, fig_num=1, save_as_png=False, dpi=300):
             plt.plot(t, np.linalg.norm(state_errors, axis=1), label=f'Total State Error', color='k')
             plt.xlabel('Time [s]')
             plt.ylabel('Error')
+            plt.title('Total State Error vs Time')
             plt.legend(loc='upper right')
             plt.grid(True)
 
@@ -244,8 +249,8 @@ def plot_rover_position_error(ekf_sim_sum, save_as_png=False, dpi=300):
 
             position_idx = [0, 3, 6]
 
-            confidence_interval_upper = state_errors[:, position_idx[state_idx]] + 3 * covariance_time_steps[:, position_idx[state_idx], position_idx[state_idx]]
-            confidence_interval_lower = state_errors[:, position_idx[state_idx]] - 3 * covariance_time_steps[:, position_idx[state_idx], position_idx[state_idx]]
+            confidence_interval_upper = state_errors[:, position_idx[state_idx]] + 3 * np.sqrt(covariance_time_steps[:, position_idx[state_idx], position_idx[state_idx]])
+            confidence_interval_lower = state_errors[:, position_idx[state_idx]] - 3 * np.sqrt(covariance_time_steps[:, position_idx[state_idx], position_idx[state_idx]])
 
             if run_idx == 0:
                 axs[state_idx].plot(t, state_errors[:, position_idx[state_idx]], label=f'{state_labels[position_idx[state_idx]]} Error', color='k')
@@ -261,11 +266,104 @@ def plot_rover_position_error(ekf_sim_sum, save_as_png=False, dpi=300):
         if run_idx == 0:
             axs[-1].set_xlabel('Time')
 
-        fig.suptitle('State Errors Over Time', fontsize=16)
+        fig.suptitle('Position Errors Over Time', fontsize=16)
 
     # Save as PNG with higher DPI if requested
     if save_as_png:
         plt.savefig('rover_position_error.png', format='png', dpi=dpi)
+
+def animate_rover_trajectory(ekf_sim_sum, monte_idx=2, num_points=1, interval=1, save_animation=False, filename="rover_animation.mp4"):
+    """
+    Creates an animated plot for the rover trajectory showing the last 'num_points' with varying brightness.
+    
+    Parameters:
+    rover_trajectory (np.ndarray): Array of shape (5000, 9), where column 0 is x and column 3 is y.
+    kalman_estimate (np.ndarray): Array of Kalman estimates, although not used for the plot here.
+    num_points (int): Number of recent points to display in the animation.
+    interval (int): Time interval (ms) between frames in the animation.
+    """
+    # Create figure and axis
+    fig, ax = plt.subplots()
+
+    rover_trajectory = ekf_sim_sum['rover_trajectories'][monte_idx]['state_sum']
+    kalman_estimate = ekf_sim_sum['monte_ekf_estimates'][monte_idx]
+
+    # Set axis limits based on beacon positions
+    min_x = np.min(beacons[:, 0])
+    max_x = np.max(beacons[:, 0])
+    min_y = np.min(beacons[:, 1])
+    max_y = np.max(beacons[:, 1])
+
+    # Add some padding to the limits
+    padding = 2.0
+    ax.set_xlim(min_x - padding, max_x + padding)
+    ax.set_ylim(min_y - padding, max_y + padding)
+
+    # Add title and labels
+    ax.set_title("Rover Trajectory vs Kalman Estimate")
+    ax.set_xlabel("X Position")
+    ax.set_ylabel("Y Position")
+
+    # Initialize deques to hold the last 'num_points' points for both trajectories
+    rover_queue = deque(maxlen=num_points)
+    kalman_queue = deque(maxlen=num_points)
+
+    # Create scatter plots for both actual and estimated trajectories
+    rover_scat = ax.scatter([], [], c=[], cmap='plasma', s=50, edgecolors="w", alpha=0.7, label="Rover Actual")
+    kalman_scat = ax.scatter([], [], c=[], cmap='cool', s=50, edgecolors="w", alpha=0.7, label="Kalman Estimate")
+
+    # Plot the static beacons
+    ax.scatter(beacons[:, 0], beacons[:, 1], c='red', s=100, marker='X', label="Beacons", zorder=5)
+
+    # Function to update the plot in the animation
+    def update(frame):
+        # Select every 50th time step for less computational expense
+        frame = frame * 50  # Skipping 50 steps for every animation frame
+
+        # Ensure we're not going out of bounds
+        if frame >= len(rover_trajectory):
+            return rover_scat, kalman_scat
+
+        # Add the new data points (x, y) from the current frame for both rover and Kalman estimate
+        rover_point = (rover_trajectory[frame, 0], rover_trajectory[frame, 3])
+        kalman_point = (kalman_estimate[frame, 0], kalman_estimate[frame, 3])
+        
+        rover_queue.append(rover_point)
+        kalman_queue.append(kalman_point)
+
+        # Create an array of 'brightness' values based on the recency of the points
+        rover_brightness = np.linspace(1, 0.1, len(rover_queue))  # Bright to dim
+        kalman_brightness = np.linspace(1, 0.1, len(kalman_queue))  # Bright to dim
+        
+        # Update the scatter plots for both rover and Kalman estimate
+        rover_x_vals, rover_y_vals = zip(*rover_queue)
+        kalman_x_vals, kalman_y_vals = zip(*kalman_queue)
+
+        rover_scat.set_offsets(np.c_[rover_x_vals, rover_y_vals])
+        rover_scat.set_array(rover_brightness)
+
+        kalman_scat.set_offsets(np.c_[kalman_x_vals, kalman_y_vals])
+        kalman_scat.set_array(kalman_brightness)
+
+        return rover_scat, kalman_scat
+
+    # Calculate new interval to make the animation fit into 5 seconds
+    num_frames = len(rover_trajectory) // 50  # 100 time steps
+    desired_duration = 5  # seconds
+    fps = num_frames / desired_duration  # Frames per second
+    interval = 1000 / fps  # Interval in milliseconds
+
+    # Create the animation
+    ani = FuncAnimation(fig, update, frames=num_frames, interval=interval, blit=True)
+
+    # Move the legend outside the plot
+    ax.legend()
+
+    # Save the animation if the flag is True
+    if save_animation:
+        ani.save(filename, writer='ffmpeg', fps=fps)
+
+    plt.show()
 
 
 if __name__ == "__main__":
@@ -275,8 +373,7 @@ if __name__ == "__main__":
 
     ekf_sim_sum = rover_ekf_simulations(rover_trajectories)
 
-    plot_rover_trajectory(rover_trajectories, fig_num=1, save_as_png=True)
-    plot_rover_ekf_error(ekf_sim_sum, fig_num=2, save_as_png=True)
-    plot_rover_position_error(ekf_sim_sum, save_as_png=True)
-
-    plt.show()
+    #plot_rover_trajectory(rover_trajectories, fig_num=1, save_as_png=True)
+    #plot_rover_ekf_error(ekf_sim_sum, fig_num=2, save_as_png=True)
+    #plot_rover_position_error(ekf_sim_sum, save_as_png=True)
+    animate_rover_trajectory(ekf_sim_sum, save_animation=True)
