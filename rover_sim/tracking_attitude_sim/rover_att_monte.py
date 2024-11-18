@@ -284,6 +284,61 @@ def plot_quaternion_error(true_attitudes_all, estimated_attitudes_all, estimatio
     plt.grid(True)
     plt.tight_layout()
 
+def quaternion_to_euler(quat):
+    """
+    Converts a quaternion to Euler angles (roll, pitch, yaw).
+
+    Parameters:
+    - quat: Quaternion in the format [w, x, y, z].
+
+    Returns:
+    - euler_angles: Euler angles [roll, pitch, yaw] in degrees.
+    """
+    rotation = Rotation.from_quat(quat[[1, 2, 3, 0]])  # Convert to [x, y, z, w] for SciPy
+    euler_angles = rotation.as_euler('xyz', degrees=True)
+    return euler_angles
+
+def plot_euler_angle_error(true_attitudes_all, estimated_attitudes_all, estimation_step_interval=simulation_hz // estimation_hz, dt=(1 / simulation_hz)):
+    """
+    Plots the error in Euler angles (roll, pitch, yaw) over time for each Monte Carlo run.
+
+    Parameters:
+    - true_attitudes_all (np.ndarray): True quaternions (shape: monte_runs x num_steps x 4).
+    - estimated_attitudes_all (np.ndarray): Estimated quaternions (shape: monte_runs x num_estimation_steps x 4).
+    - estimation_step_interval (int): Interval between simulation and estimation steps.
+    - dt (float): Time step between each sample in seconds.
+    """
+    monte_runs, num_estimation_steps = estimated_attitudes_all.shape[0], estimated_attitudes_all.shape[1]
+    time_array = np.linspace(0, num_estimation_steps * dt * estimation_step_interval, num_estimation_steps)
+
+    fig, axs = plt.subplots(3, 1, figsize=(12, 10))
+    fig.suptitle("Euler Angle Error Over Time for All Monte Carlo Runs")
+
+    euler_labels = ['Roll (degrees)', 'Pitch (degrees)', 'Yaw (degrees)']
+    for monte_idx in range(monte_runs):
+        euler_errors = np.zeros((num_estimation_steps, 3))  # Store errors for roll, pitch, yaw
+        for step in range(num_estimation_steps):
+            true_quat = true_attitudes_all[monte_idx, step * estimation_step_interval]
+            estimated_quat = estimated_attitudes_all[monte_idx, step]
+            
+            # Convert quaternions to Euler angles
+            true_euler = quaternion_to_euler(true_quat)
+            estimated_euler = quaternion_to_euler(estimated_quat)
+            
+            # Compute error as difference in Euler angles
+            euler_errors[step] = true_euler - estimated_euler
+
+        for i in range(3):  # Roll, Pitch, Yaw
+            axs[i].plot(time_array, euler_errors[:, i])
+
+    for i in range(3):
+        axs[i].set_title(euler_labels[i])
+        axs[i].set_xlabel('Time (s)')
+        axs[i].set_ylabel(euler_labels[i])
+        axs[i].grid(True)
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+
 
 if __name__ == "__main__":
 
@@ -293,5 +348,6 @@ if __name__ == "__main__":
 
     visualize_quaternion_trajectories(monte_sum['att'])
     plot_quaternion_error(monte_sum['att'], ekf_sum)
+    plot_euler_angle_error(monte_sum['att'], ekf_sum)
 
     plt.show()
